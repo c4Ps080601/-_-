@@ -147,3 +147,19 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Public release: exclude local credentials, essays and build artifacts
+node_modules/
+dist/
+work/
+outputs/
+*.log
+
+data/
+settings.json
+.env*
+!.env.example
+*.exe
+*.zip
+*.png
+!build/**

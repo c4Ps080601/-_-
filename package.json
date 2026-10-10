@@ -1,0 +1,91 @@
+{
+  "name": "essay-grader-public",
+  "version": "3.1.3",
+  "description": "续写批改站 Windows 桌面版（浙江高考读后续写批改）",
+  "author": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "node --test test/*.test.cjs",
+    "dev": "electron .",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis",
+    "dist:minor": "node scripts/bump-version.js --minor && electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac",
+    "dist:mac:universal": "node scripts/bump-version.js --minor && electron-builder --mac --universal"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "html-to-image": "^1.11.13",
+    "multer": "^2.2.0",
+    "pdfkit": "^0.19.1"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "playwright": "^1.49.1"
+  },
+  "build": {
+    "appId": "org.essaygrader.public",
+    "productName": "续写批改站公开版",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "grader.js",
+      "rubric.js",
+      "store.js",
+      "settings.js",
+      "pdf-export.js",
+      "preload.js",
+      "config.json",
+      "public/**/*",
+      "providers.js",
+      "build/icon.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.education",
+      "darkModeSupport": true
+    },
+    "afterPack": "./scripts/after-pack.js",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "续写批改站公开版",
+      "differentialPackage": false
+    }
+  }
+}
