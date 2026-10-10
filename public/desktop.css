@@ -1,0 +1,77 @@
+/* 桌面版增强：设置弹窗、拖拽高亮（Claude 暖色风格） */
+.gear-btn { font-size: 0.938rem; padding: 0.25rem 0.625rem; }
+
+/* 设置页：软件说明 */
+.about-note {
+  margin-top: 16px; padding: 0.75rem 0.875rem;
+  background: #f0eee6; border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--muted);
+  line-height: 1.8;
+}
+.about-note a { color: var(--primary); text-decoration: none; }
+.about-note a:hover { text-decoration: underline; }
+
+.modal-mask {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(20,20,19,0.45); backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center; padding: 1.25rem;
+  animation: modal-fade 180ms ease backwards;
+}
+@keyframes modal-fade { from { opacity: 0; } }
+
+.modal-card {
+  width: 100%; max-width: 520px; max-height: 86vh; overflow: auto;
+  background: #faf9f5; border: 1px solid #e8e6dc; border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(20,20,19,0.2);
+  animation: modal-in 240ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+}
+
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--line);
+}
+.modal-head h3 { font-size: 1rem; }
+.modal-close {
+  border: none; background: transparent; font-size: 1.375rem; line-height: 1;
+  color: var(--muted); cursor: pointer; padding: 2px 6px; border-radius: 8px;
+}
+.modal-close:hover { background: #f0eee6; color: var(--ink); }
+
+.modal-body { padding: 1.125rem 1.25rem; }
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 0.875rem 1.25rem; border-top: 1px solid var(--line);
+}
+
+.set-label { display: block; font-size: 0.813rem; color: var(--muted); margin-bottom: 14px; }
+.set-label input {
+  display: block; width: 100%; margin-top: 6px;
+  padding: 0.625rem 0.75rem; border: 1px solid var(--line-strong); border-radius: 10px;
+  font-size: 0.875rem; font-family: inherit; background: #fdfcf8; color: var(--ink);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+.set-label input:focus {
+  outline: none; border-color: #3898ec;
+  box-shadow: 0 0 0 3px rgba(56,152,236,0.18); background: #fff;
+}
+.set-row { display: flex; gap: 10px; padding: 7px 0; font-size: 0.813rem; align-items: baseline; }
+.set-key { color: var(--muted); flex-shrink: 0; width: 72px; }
+.set-val { color: var(--ink); word-break: break-all; }
+.font-scale-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.fs-btn {
+  border: 1px solid var(--line-strong); background: #fdfcf8; color: var(--muted);
+  border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.75rem;
+  cursor: pointer; font-family: inherit;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.fs-btn:hover { border-color: #d1cfc5; color: var(--ink); }
+.fs-btn.active { background: var(--primary); border-color: var(--primary); color: #faf9f5; }
+.set-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+.dropzone.drag-over {
+  border-color: var(--primary); background: #f8f4ea;
+  box-shadow: 0 0 0 3px rgba(201,100,66,0.15);
+}

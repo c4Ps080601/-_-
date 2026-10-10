@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>续写批改站</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="desktop.css" />
+<link rel="stylesheet" href="workspace.css" />
+<script>
+try {
+  document.documentElement.dataset.theme = localStorage.getItem('eg_theme') === 'dark' ? 'dark' : 'light';
+  const scale = Number(localStorage.getItem('eg_fontscale'));
+  if ([0.85, 1, 1.15, 1.3].includes(scale)) document.documentElement.style.fontSize = 16 * scale + 'px';
+} catch (e) { document.documentElement.dataset.theme = 'light'; }
+</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>" />
+</head>
+<body>
+
+<!-- ============ 登录/注册 ============ -->
+<div id="view-login" class="login-wrap hidden">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-logo">📝</div>
+      <h1>续写批改站</h1>
+      <p class="brand-sub">读后续写 · 提交作文 · AI 批改评分</p>
+    </div>
+    <form id="form-enter" class="auth-form">
+      <label>用户名
+        <input type="text" name="username" placeholder="输入你的名字即可进入" autocomplete="off" required />
+      </label>
+      <button type="submit" class="btn primary btn-block">进 入</button>
+      <div class="form-msg error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ 主应用 ============ -->
+<div id="view-app" class="app hidden">
+  <aside class="sidebar" aria-label="主导航">
+    <div class="sidebar-brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v16M12 5C8 2 4 3 2 4v15c4-2 7-1 10 2 3-3 6-4 10-2V4c-2-1-6-2-10 1Z"/></svg><span>续写批改站</span></div>
+    <nav class="nav" aria-label="工作区">
+      <button class="nav-btn active" data-view="dashboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H5v20h14V7l-5-5ZM14 2v5h5M8 12h8M8 16h8"/></svg><span>我的作文</span></button>
+      <button class="nav-btn" data-view="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 3 6 6-12 12H3v-6L15 3ZM12 6l6 6M3 21h18"/></svg><span>提交作文</span></button>
+      <button class="nav-action" id="btn-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1-2 4 2 2v4l4 2 3-1 3 1 4-2v-4l2-2-2-4-3-1-1-3H9Z"/><circle cx="12" cy="12" r="3"/></svg><span>设置</span></button>
+    </nav>
+    <section class="recent-section" aria-label="最近作文">
+      <h2>最近作文</h2><div id="recent-list"><p class="muted">暂无作文</p></div>
+    </section>
+    <div class="sidebar-account">
+      <div class="account-row"><span class="account-avatar" id="user-avatar" aria-hidden="true"></span><div class="account-info"><span id="user-name" class="user-name"></span><span id="user-role" class="role-badge"></span></div></div>
+      <button id="btn-logout" class="btn ghost small">切换用户</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- 仪表盘 -->
+    <section id="view-dashboard" class="view">
+      <div class="list-head">
+        <h2 id="list-title">我的作文</h2>
+        <span id="list-count" class="muted"></span>
+        <button class="btn primary" type="button" onclick="location.hash='#/submit'">提交作文</button>
+      </div>
+      <div id="submission-list" class="sub-list"></div>
+    </section>
+
+    <!-- 提交 -->
+    <section id="view-submit" class="view hidden">
+      <div class="submit-heading"><h2>提交读后续写</h2><button class="btn ghost" type="button" id="btn-new-draft">新建作文</button></div>
+      <div class="draft-state"><span id="draft-status" role="status">填写文字或识别图片后自动保存草稿。</span><button class="btn ghost small hidden" type="button" id="btn-save-copy">另存为新草稿</button><button class="btn ghost small hidden" type="button" id="btn-delete-draft">删除草稿</button></div>
+
+      <div class="card ocr-card" style="margin-bottom:16px">
+        <h3 style="font-size:15px;margin-bottom:6px">📷 拍照 / 图片识别（可选）</h3>
+        <p class="hint" style="margin-bottom:2px">上传作文纸 / 题目纸照片（最多 4 张），自动识别原文、段首句和两段续写并填入下方表单，识别后可以手动修改。</p>
+        <label class="dropzone" for="ocr-files">
+          <input type="file" id="ocr-files" accept="image/*" multiple hidden />
+          <span class="dz-icon">📷</span>
+          <span class="dz-text">点击选择作文纸照片</span>
+          <span class="dz-sub">支持多次选择，图片自动累加，最多 4 张</span>
+        </label>
+        <div id="ocr-preview" class="ocr-preview"></div>
+        <button type="button" class="btn primary" id="btn-ocr" style="margin-top:10px">🔍 识别图片并填入表单</button>
+        <div class="form-msg" id="ocr-msg"></div>
+      </div>
+
+      <form id="form-submit" class="card form">
+        <label>标题 / 题目关键词（可选）
+          <input type="text" name="title" placeholder="如：A Special Gift" />
+        </label>
+        <label>原文 + 段首句（必填）
+          <textarea name="originalText" rows="7" required placeholder="粘贴题目原文和两个段首句，批改需要结合原文判断衔接与情节合理性"></textarea>
+        </label>
+        <label>你的续写（必填）
+          <textarea name="essayText" rows="12" required placeholder="粘贴或输入你的续写内容"></textarea>
+          <span class="hint" id="word-count">0 词</span>
+        </label>
+        <div class="form-msg error"></div>
+        <button type="submit" class="btn primary btn-block" id="btn-submit">提交批改</button>
+        <p class="note ocr-check-note"><strong>请核对识别的文字稿是否与您的原文是否一致，如有识别错误，可以直接修改；未经修改的识别错误可能会被记录为语法错误等</strong></p>
+        <p class="note">提交后请保持软件运行，完成后会自动显示结果。25分制，结合高考整体评价框架与教师经验准则；文字稿批改不评价手写卷面。</p>
+      </form>
+    </section>
+
+    <!-- 结果 -->
+    <section id="view-result" class="view hidden">
+      <div id="result-body"></div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="vendor/html-to-image.js"></script>
+<script src="app.js"></script>
+<script src="drafts.js"></script>
+<script src="desktop.js"></script>
+</body>
+</html>
