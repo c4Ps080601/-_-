@@ -1,0 +1,60 @@
+'use strict';
+const test = require('node:test'), assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'essay-v31-drafts-'));
+process.env.EG_DATA_DIR = path.join(dir, 'data'); process.env.EG_SETTINGS_FILE = path.join(dir, 'settings.json');
+const { app } = require('../server'), store = require('../store'), grader = require('../grader'), settings = require('../settings');
+settings.getAIConfig = () => ({ ...require('../providers').normalizeConfig({ provider: 'deepseek' }), apiKey: 'unit-test-no-real-key' });
+const essay = ('One day he arrived. ' + 'They carefully helped the little child find her family. '.repeat(4)).trim();
+const fields = { title: 'A Draft', originalText: 'A child lost her way.', essayText: essay };
+const reply = content => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(content) } }] }), { status: 200 });
+test('草稿API与队列：OCR先保存、修订防覆盖、同一草稿只提交一次、跨用户保护与重启恢复', async () => {
+  const server = app.listen(0, '127.0.0.1'); await new Promise(r => server.on('listening', r));
+  const base = 'http://127.0.0.1:' + server.address().port, originalFetch = global.fetch;
+  let gradeCalls = 0, release; const gate = new Promise(r => { release = r; });
+  global.fetch = async (url, opts) => {
+    if (!String(url).startsWith('https://api.deepseek.com/')) return originalFetch(url, opts);
+    const body = JSON.parse(opts.body); assert.equal(opts.headers.Authorization, 'Bearer unit-test-no-real-key');
+    if (body.reasoning_effort === 'low') return reply({ originalText: fields.originalText, starter1: '', starter2: '', para1: essay, para2: '', taskRequirements: '150词左右', keywords: [] });
+    assert.equal(body.reasoning_effort, 'high'); gradeCalls++; await gate;
+    const material = JSON.parse(body.messages[1].content.slice(body.messages[1].content.indexOf('{')));
+    return reply({ score: 20, errorCount: 0, title: 'A Helpful Encounter', summary: '第四档，故事完成。', assessment: { plotStatus: 'reasonable', continuationComplete: true, reason: '完成帮助与团聚。', taskNotes: [] }, dimensions: { plot: { score: 8, comment: '完整' }, language: { score: 5, comment: '有效' }, grammar: { score: 4, comment: '准确' }, coherence: { score: 3, comment: '连贯' } }, errors: [], highlights: [], uncertainIssues: [], improvements: [], suggestions: [], polishedParagraphs: material.essayParagraphs });
+  };
+  try {
+    const login = async username => { const r = await originalFetch(base + '/api/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) }); return r.headers.get('set-cookie').split(';')[0]; };
+    const cookie = await login('草稿作者'), other = await login('其他用户');
+    const request = (url, method = 'GET', body, who = cookie) => originalFetch(base + url, { method, headers: { Cookie: who, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    let r = await request('/api/drafts', 'POST', { clientId: 'manual-one', ...fields }); let draft = (await r.json()).submission;
+    assert.equal(draft.status, 'draft'); assert.equal(gradeCalls, 0);
+    const repeated = (await (await request('/api/drafts', 'POST', { clientId: 'manual-one', ...fields })).json()).submission;
+    assert.equal(repeated.id, draft.id); assert.equal(store.listSubmissions({ role: 'teacher' }).length, 1);
+    assert.equal((await request('/api/drafts/' + draft.id, 'PUT', { ...fields, revision: 1 }, other)).status, 403);
+    const edited = { ...fields, essayText: essay + ' Everyone smiled.' };
+    draft = (await (await request('/api/drafts/' + draft.id, 'PUT', { ...edited, revision: 1 })).json()).submission;
+    assert.equal(draft.draftRevision, 2);
+    assert.equal((await request('/api/drafts/' + draft.id, 'PUT', { ...fields, revision: 1 })).status, 409);
+    assert.equal(store.getSubmission(draft.id).essayText, edited.essayText);
+    assert.equal((await request('/api/submissions/' + draft.id + '/regrade', 'POST')).status, 409);
+    const submitted = await request('/api/drafts/' + draft.id + '/submit', 'POST', { ...edited, revision: 2 }); assert.equal(submitted.status, 200);
+    assert.equal((await submitted.json()).submission.status, 'grading');
+    await request('/api/drafts/' + draft.id + '/submit', 'POST', { ...edited, revision: 2 });
+    await request('/api/submissions/' + draft.id + '/regrade', 'POST');
+    assert.equal(grader.enqueue(draft.id), false); assert.equal(gradeCalls, 1);
+    assert.equal((await request('/api/drafts/' + draft.id, 'PUT', { ...edited, revision: 2 })).status, 409);
+    const multipart = new FormData(); multipart.append('images', new Blob([Buffer.from('unit-test-image')], { type: 'image/png' }), 'test.png'); multipart.append('saveDraft', 'true'); multipart.append('clientId', 'ocr-one');
+    const ocrResponse = await originalFetch(base + '/api/ocr', { method: 'POST', headers: { Cookie: cookie }, body: multipart });
+    const ocr = await ocrResponse.json(); assert.equal(ocr.draft.status, 'draft'); assert.equal(ocr.draft.essayText, essay);
+    assert.ok(fs.readFileSync(path.join(dir, 'data/db.json'), 'utf8').includes('ocr-one'));
+    assert.deepEqual(fs.readdirSync(path.join(dir, 'data/uploads')), []);
+    release();
+    for (let i = 0; i < 100 && store.getSubmission(draft.id).status !== 'done'; i++) await new Promise(r => setTimeout(r, 5));
+    assert.equal(store.getSubmission(draft.id).status, 'done'); assert.equal(gradeCalls, 1);
+    store.load(); assert.equal(store.getSubmission(ocr.draft.id).essayText, essay);
+    const interrupted = store.createSubmission({ userId: draft.userId, ...fields }); store.setSubmissionStatus(interrupted.id, 'grading');
+    grader.recoverInterruptedJobs(); assert.equal(store.getSubmission(interrupted.id).status, 'error'); assert.match(store.getSubmission(interrupted.id).error, /被中断/); assert.equal(gradeCalls, 1);
+    const pending = store.createSubmission({ userId: draft.userId, ...fields }); grader.recoverInterruptedJobs();
+    for (let i = 0; i < 100 && store.getSubmission(pending.id).status !== 'done'; i++) await new Promise(r => setTimeout(r, 5));
+    assert.equal(store.getSubmission(pending.id).status, 'done'); assert.equal(gradeCalls, 2);
+  } finally { release(); global.fetch = originalFetch; await new Promise(r => server.close(r)); }
+});
+
